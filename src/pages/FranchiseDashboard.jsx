@@ -8,7 +8,8 @@ import {
   ShoppingBagIcon,
   UsersIcon,
   BuildingStorefrontIcon,
-  PencilIcon
+  PencilIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 
 const FranchiseDashboard = () => {
@@ -22,6 +23,8 @@ const FranchiseDashboard = () => {
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [uniqueCustomers, setUniqueCustomers] = useState(0);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Initialize dashboard data
   useEffect(() => {
@@ -134,11 +137,80 @@ const FranchiseDashboard = () => {
            'User';
   };
 
+  // Format status for display
+  const formatStatus = (status) => {
+    if (status === 'verify payment') return 'Verify Payment';
+    return status.split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  const handlePaymentConfirmation = async () => {
+    if (!selectedOrder) return;
+    
+    try {
+      await orderService.updateOrderStatus(selectedOrder.id, 'processing order');
+      // Update the order in the local state
+      setOrders(orders.map(order => 
+        order.id === selectedOrder.id 
+          ? { ...order, status: 'processing order' }
+          : order
+      ));
+      setShowConfirmModal(false);
+      setSelectedOrder(null);
+    } catch (error) {
+      console.error('Error confirming payment:', error);
+      // You might want to show an error message to the user here
+    }
+  };
+
   if (!currentUser && !sessionStorage.getItem('userId')) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Confirmation Modal */}
+        {showConfirmModal && selectedOrder && (
+          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl p-6 w-full max-w-md relative animate-fadeIn">
+              <XMarkIcon 
+                className="h-5 w-5 absolute right-4 top-4 text-gray-400 hover:text-gray-600 cursor-pointer transition-colors" 
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  setSelectedOrder(null);
+                }}
+              />
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Confirm Payment</h2>
+              
+              <div className="bg-gray-50 p-3 rounded-lg text-sm mb-4">
+                <p className="text-gray-600">
+                  Order: <span className="font-medium text-gray-900">{selectedOrder.trackingNumber}</span>
+                </p>
+                <p className="text-gray-600">
+                  Customer: <span className="font-medium text-gray-900">{selectedOrder.customerInfo.firstName} {selectedOrder.customerInfo.lastName}</span>
+                </p>
+              </div>
+
+              <div className="flex justify-center gap-3">
+                <button
+                  onClick={() => {
+                    setShowConfirmModal(false);
+                    setSelectedOrder(null);
+                  }}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePaymentConfirmation}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+                >
+                  Confirm Payment
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Welcome Section */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between">
@@ -293,13 +365,23 @@ const FranchiseDashboard = () => {
                         {new Date(order.createdAt.toDate()).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          order.status === 'processing' ? 'bg-blue-100 text-blue-800' :
-                          order.status === 'completed' ? 'bg-green-100 text-green-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                        <span 
+                          className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            order.status === 'processing order' ? 'bg-blue-100 text-blue-800' :
+                            order.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            order.status === 'verify payment' ? 'bg-purple-100 text-purple-800 cursor-pointer hover:bg-purple-200' :
+                            'bg-gray-100 text-gray-800'
+                          }`}
+                          onClick={(e) => {
+                            if (order.status === 'verify payment') {
+                              e.stopPropagation();
+                              setSelectedOrder(order);
+                              setShowConfirmModal(true);
+                            }
+                          }}
+                        >
+                          {formatStatus(order.status)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

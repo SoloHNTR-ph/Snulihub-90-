@@ -321,7 +321,7 @@ const Checkout = () => {
         userId: userId,
         items: cartItems,
         storeSlug: storeSlug,
-        franchiseId: storeData.franchiseId, // Ensure we have the franchiseId
+        franchiseId: storeData?.franchiseId || 'default', // Handle both franchise and default store cases
         shippingAddress: {
           address: formData.address,
           city: formData.city,
@@ -404,6 +404,7 @@ const Checkout = () => {
       // Create order with new user
       const orderData = {
         userId: generatedId,
+        franchiseId: storeData?.franchiseId || 'default', // Handle both franchise and default store cases
         items: cartItems.map(item => ({
           ...item,
           name: item.name,

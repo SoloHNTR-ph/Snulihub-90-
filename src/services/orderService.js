@@ -25,7 +25,7 @@
 
 
 
-import { getFirestore, collection, addDoc, doc, getDoc, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, doc, getDoc, query, where, getDocs, orderBy, updateDoc, serverTimestamp } from 'firebase/firestore';
 import app from '../firebaseConfig';
 
 const db = getFirestore(app);
@@ -242,9 +242,49 @@ export const getOrdersByFranchiseId = async (franchiseId) => {
   }
 };
 
+export const getOrdersByUserId = async (userId) => {
+  try {
+    const ordersRef = collection(db, 'orders');
+    const q = query(
+      ordersRef,
+      where('userId', '==', userId)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const orders = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    // Sort by createdAt in descending order
+    return orders.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
+  } catch (error) {
+    console.error('Error getting user orders:', error);
+    throw error;
+  }
+};
+
+// Update order status
+async function updateOrderStatus(orderId, status) {
+  try {
+    const db = getFirestore(app);
+    const orderRef = doc(db, 'orders', orderId);
+    await updateDoc(orderRef, {
+      status: status.toLowerCase(), // ensure consistent casing
+      updatedAt: serverTimestamp()
+    });
+    return true;
+  } catch (error) {
+    console.error('Error updating order status:', error);
+    throw error;
+  }
+}
+
 export default {
   createOrder,
   getOrderById,
   getOrdersByCode,
-  getOrdersByFranchiseId
+  getOrdersByFranchiseId,
+  getOrdersByUserId,
+  updateOrderStatus
 };

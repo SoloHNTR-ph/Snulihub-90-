@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { MagnifyingGlassIcon, UserIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { collection, query, where, getDocs, getFirestore } from 'firebase/firestore';
+import { MagnifyingGlassIcon, UserIcon, XMarkIcon, PhotoIcon } from '@heroicons/react/24/outline';
+import { collection, query, where, getDocs, getFirestore, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import app from '../firebaseConfig';
+import orderService from '../services/orderService';
 
 const Tracking = () => {
   const { customerUserId, orderCodeWithFranchise: orderCode } = useParams();
   const [searchQuery, setSearchQuery] = useState('');
-  const [paymentStatus, setPaymentStatus] = useState('pending'); // 'pending' or 'received'
+  const [paymentStatus, setPaymentStatus] = useState('pending');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    amount: '',
+    referenceNumber: '',
+    proofOfPayment: null,
+    paymentMethod: ''
+  });
   const [passwordForm, setPasswordForm] = useState({
     password: '',
     confirmPassword: ''
@@ -16,6 +24,7 @@ const Tracking = () => {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -92,6 +101,59 @@ const Tracking = () => {
     }
     // Handle password submission here
     setShowPasswordModal(false);
+  };
+
+  const handlePaymentFormChange = (e) => {
+    const { name, value, files } = e.target;
+    if (name === 'proofOfPayment' && files) {
+      setPaymentForm(prev => ({
+        ...prev,
+        [name]: files[0]
+      }));
+    } else if (name === 'amount') {
+      // Only allow numbers and decimal point
+      const numericValue = value.replace(/[^\d.]/g, '');
+      // Ensure only one decimal point
+      const parts = numericValue.split('.');
+      const formattedValue = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : numericValue;
+      setPaymentForm(prev => ({
+        ...prev,
+        [name]: formattedValue
+      }));
+    } else {
+      setPaymentForm(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+  };
+
+  const handlePaymentSubmit = async (e) => {
+    e.preventDefault();
+    if (!order?.id) return;
+
+    try {
+      setSubmitting(true);
+      
+      // Here you would typically upload the proof of payment image to storage
+      // and get the URL, but for now we'll just update the status
+      
+      await orderService.updateOrderStatus(order.id, 'verify payment');
+      
+      // Update local state
+      setOrder(prev => ({
+        ...prev,
+        status: 'verify payment'
+      }));
+      setPaymentStatus('verify payment');
+      setShowPaymentModal(false);
+      
+    } catch (error) {
+      console.error('Error submitting payment:', error);
+      alert('Failed to submit payment. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const steps = [
@@ -173,7 +235,7 @@ const Tracking = () => {
         <div className="bg-white rounded-xl shadow-sm p-6 sm:p-8 h-auto">
           <div className="text-center mb-8">     
             <h1 className="text-2xl font-semibold text-gray-900">Track Your Order</h1>
-            <p className="mt-2 text-gray-600">Order ID: {orderCode || 'Not available'}</p>
+            <p className="mt-2 text-gray-600">Order ID: {order?.trackingNumber || 'Not available'}</p>
           </div>
 
           <div className="flex justify-between items-start w-full mb-8 relative">
@@ -213,6 +275,10 @@ const Tracking = () => {
                                 <div className="h-8 w-8 rounded-full border-2 border-yellow-500 bg-white flex items-center justify-center">
                                   <div className="h-2.5 w-2.5 rounded-full bg-yellow-500" />
                                 </div>
+                              ) : paymentStatus === 'verify payment' ? (
+                                <div className="h-8 w-8 rounded-full border-2 border-blue-600 bg-white flex items-center justify-center">
+                                  <div className="h-2.5 w-2.5 rounded-full bg-blue-600" />
+                                </div>
                               ) : (
                                 <div className="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center">
                                   <svg className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor">
@@ -226,14 +292,16 @@ const Tracking = () => {
                                 <>
                                   <p className="text-yellow-600 font-medium text-sm">Pending Payment</p>
                                   <button
-                                    onClick={handlePaymentSent}
+                                    onClick={() => setShowPaymentModal(true)}
                                     className="mt-2 inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded-full text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors whitespace-nowrap"
                                   >
                                     Send Payment
                                   </button>
                                 </>
+                              ) : paymentStatus === 'verify payment' ? (
+                                <p className="text-blue-600 font-medium text-sm">Waiting for Approval</p>
                               ) : (
-                                <p className="text-green-600 font-medium text-sm">Payment sent</p>
+                                <p className="text-green-600 font-medium text-sm">Payment Approved</p>
                               )}
                             </div>
                           </div>
@@ -290,6 +358,212 @@ const Tracking = () => {
                 className="w-full bg-blue-600 text-white py-3 px-4 rounded-xl hover:bg-blue-700 transition-all duration-200 font-medium shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 hover:scale-[1.02] active:scale-[0.98]"
               >
                 Set Password
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl p-6 w-full max-w-md relative animate-fadeIn">            
+            <XMarkIcon 
+              className="h-5 w-5 absolute right-4 top-4 text-gray-400 hover:text-gray-600 cursor-pointer transition-colors" 
+              onClick={() => setShowPaymentModal(false)}
+            />
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Send Payment</h2>
+            
+            <form onSubmit={handlePaymentSubmit} className="space-y-4">
+              {/* Payment Method Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Choose Payment Method
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {/* GCash */}
+                  <label 
+                    className={`relative flex flex-col items-center p-3 border-2 rounded-lg cursor-pointer transition-all duration-200 
+                      ${paymentForm.paymentMethod === 'gcash' 
+                        ? 'border-blue-500 bg-blue-50' 
+                        : 'border-gray-200 hover:border-blue-200'}`}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="gcash"
+                      checked={paymentForm.paymentMethod === 'gcash'}
+                      onChange={handlePaymentFormChange}
+                      className="sr-only"
+                    />
+                    <img src="/gcash-logo.png" alt="GCash" className="h-6 w-auto mb-1" />
+                    <span className="text-xs font-medium">GCash</span>
+                    {paymentForm.paymentMethod === 'gcash' && (
+                      <div className="absolute top-1 right-1 h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                      </div>
+                    )}
+                  </label>
+
+                  {/* Maya */}
+                  <label 
+                    className={`relative flex flex-col items-center p-3 border-2 rounded-lg cursor-pointer transition-all duration-200 
+                      ${paymentForm.paymentMethod === 'maya' 
+                        ? 'border-blue-500 bg-blue-50' 
+                        : 'border-gray-200 hover:border-blue-200'}`}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="maya"
+                      checked={paymentForm.paymentMethod === 'maya'}
+                      onChange={handlePaymentFormChange}
+                      className="sr-only"
+                    />
+                    <img src="/maya-logo.png" alt="Maya" className="h-6 w-auto mb-1" />
+                    <span className="text-xs font-medium">Maya</span>
+                    {paymentForm.paymentMethod === 'maya' && (
+                      <div className="absolute top-1 right-1 h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                      </div>
+                    )}
+                  </label>
+
+                  {/* Bank Transfer */}
+                  <label 
+                    className={`relative flex flex-col items-center p-3 border-2 rounded-lg cursor-pointer transition-all duration-200 
+                      ${paymentForm.paymentMethod === 'bank' 
+                        ? 'border-blue-500 bg-blue-50' 
+                        : 'border-gray-200 hover:border-blue-200'}`}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="bank"
+                      checked={paymentForm.paymentMethod === 'bank'}
+                      onChange={handlePaymentFormChange}
+                      className="sr-only"
+                    />
+                    <img src="/bank-logo.png" alt="Bank Transfer" className="h-6 w-auto mb-1" />
+                    <span className="text-xs font-medium">Bank</span>
+                    {paymentForm.paymentMethod === 'bank' && (
+                      <div className="absolute top-1 right-1 h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                      </div>
+                    )}
+                  </label>
+                </div>
+              </div>
+
+              {/* Payment Details - Show if a payment method is selected */}
+              {paymentForm.paymentMethod && (
+                <>
+                  {/* Payment Instructions */}
+                  <div className="bg-gray-50 p-3 rounded-lg text-xs">
+                    <h3 className="font-medium text-gray-900 mb-1">Payment Details</h3>
+                    {paymentForm.paymentMethod === 'gcash' && (
+                      <div className="text-gray-600">
+                        <p>GCash: 09123456789</p>
+                        <p>Name: SnuliHub Store</p>
+                      </div>
+                    )}
+                    {paymentForm.paymentMethod === 'maya' && (
+                      <div className="text-gray-600">
+                        <p>Maya: 09123456789</p>
+                        <p>Name: SnuliHub Store</p>
+                      </div>
+                    )}
+                    {paymentForm.paymentMethod === 'bank' && (
+                      <div className="text-gray-600">
+                        <p>BDO: 1234567890</p>
+                        <p>Name: SnuliHub Store</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label htmlFor="amount" className="block text-xs font-medium text-gray-700 mb-1">
+                        Amount
+                      </label>
+                      <style jsx>{`
+                        input[type="number"]::-webkit-inner-spin-button,
+                        input[type="number"]::-webkit-outer-spin-button {
+                          -webkit-appearance: none;
+                          margin: 0;
+                        }
+                        input[type="number"] {
+                          -moz-appearance: textfield;
+                        }
+                      `}</style>
+                      <input
+                        type="text"
+                        name="amount"
+                        id="amount"
+                        value={paymentForm.amount}
+                        onChange={handlePaymentFormChange}
+                        className="w-full px-3 py-2 rounded-lg border-0 bg-gray-100/50 text-sm text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+                        required
+                        placeholder="Enter amount"
+                        inputMode="decimal"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="referenceNumber" className="block text-xs font-medium text-gray-700 mb-1">
+                        Reference No.
+                      </label>
+                      <input
+                        type="text"
+                        name="referenceNumber"
+                        id="referenceNumber"
+                        value={paymentForm.referenceNumber}
+                        onChange={handlePaymentFormChange}
+                        className="w-full px-3 py-2 rounded-lg border-0 bg-gray-100/50 text-sm text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+                        required
+                        placeholder="Enter reference"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="proofOfPayment" className="block text-xs font-medium text-gray-700 mb-1">
+                      Proof of Payment
+                    </label>
+                    <div className="mt-1 flex justify-center px-4 py-3 border-2 border-gray-300 border-dashed rounded-lg">
+                      <div className="space-y-1 text-center">
+                        <PhotoIcon className="mx-auto h-8 w-8 text-gray-400" />
+                        <div className="flex text-xs text-gray-600">
+                          <label htmlFor="proofOfPayment" className="relative cursor-pointer rounded-md font-medium text-blue-600 hover:text-blue-500">
+                            <span>Upload a file</span>
+                            <input
+                              id="proofOfPayment"
+                              name="proofOfPayment"
+                              type="file"
+                              className="sr-only"
+                              onChange={handlePaymentFormChange}
+                              accept="image/*"
+                              required
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting || !paymentForm.paymentMethod}
+                className={`w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+                  (submitting || !paymentForm.paymentMethod) ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                {submitting ? 'Submitting...' : 'Submit Payment'}
               </button>
             </form>
           </div>
