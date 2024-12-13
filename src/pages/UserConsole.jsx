@@ -7,7 +7,10 @@ import {
   deleteDoc, 
   updateDoc, 
   serverTimestamp,
-  setDoc
+  setDoc,
+  query,
+  where,
+  orderBy
 } from 'firebase/firestore';
 import app from '../firebaseConfig';
 import { userService } from '../services/userService';
@@ -24,7 +27,11 @@ import {
   PlusIcon,
   MagnifyingGlassIcon,
   FunnelIcon,
-  UserCircleIcon
+  UserCircleIcon,
+  CurrencyDollarIcon,
+  ShoppingBagIcon,
+  UsersIcon,
+  BuildingStorefrontIcon
 } from '@heroicons/react/24/outline';
 import CreateUserModal from '../components/CreateUserModal';
 import { useAuth } from '../context/AuthContext';
@@ -164,6 +171,10 @@ const UserConsole = () => {
   const [isTestAdmin, setIsTestAdmin] = useState(false);
   const { currentUser } = useAuth();
   const [usersNeedingUpdate, setUsersNeedingUpdate] = useState(new Set());
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [totalRevenue, setTotalRevenue] = useState(0);
+  const [uniqueCustomers, setUniqueCustomers] = useState(0);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -205,6 +216,45 @@ const UserConsole = () => {
 
     checkUsersSchema();
   }, [users]);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const ordersRef = collection(db, 'orders');
+        const q = query(
+          ordersRef,
+          where('franchiseId', '==', 'default')
+          // Removed orderBy to avoid index requirement
+        );
+        
+        const querySnapshot = await getDocs(q);
+        const ordersData = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+        // Sort orders by createdAt client-side instead
+        ordersData.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
+
+        setOrders(ordersData);
+        
+        // Calculate total revenue
+        const revenue = ordersData.reduce((total, order) => total + order.totalAmount, 0);
+        setTotalRevenue(revenue);
+
+        // Calculate unique customers
+        const uniqueCustomerIds = new Set(ordersData.map(order => order.userId));
+        setUniqueCustomers(uniqueCustomerIds.size);
+
+        setOrdersLoading(false);
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        setOrdersLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, []);
 
   const fetchUsers = async () => {
     try {
@@ -690,6 +740,10 @@ const UserConsole = () => {
     return `${prefix}${String(nextNumber).padStart(6, '0')}`;
   };
 
+  const formatStatus = (status) => {
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
   return (
     <div className="container mx-auto p-4">
       {/* Header without Logout */}
@@ -996,6 +1050,123 @@ const UserConsole = () => {
                   </td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex items-center">
+            <CurrencyDollarIcon className="h-8 w-8 text-primary-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-500">Total Revenue</p>
+              <p className="text-2xl font-semibold text-gray-900">
+                ${totalRevenue.toFixed(2)}
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex items-center">
+            <ShoppingBagIcon className="h-8 w-8 text-primary-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-500">Total Orders</p>
+              <p className="text-2xl font-semibold text-gray-900">{orders.length}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex items-center">
+            <UsersIcon className="h-8 w-8 text-primary-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-500">Orders Made</p>
+              <p className="text-2xl font-semibold text-gray-900">{uniqueCustomers}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex items-center">
+            <BuildingStorefrontIcon className="h-8 w-8 text-primary-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-500">Account Status</p>
+              <p className="text-2xl font-semibold text-gray-900">Active</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Orders</h2>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead>
+              <tr>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Tracking Number
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Customer
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Date
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Total
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {ordersLoading ? (
+                <tr>
+                  <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
+                    Loading orders...
+                  </td>
+                </tr>
+              ) : orders.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
+                    No orders found
+                  </td>
+                </tr>
+              ) : (
+                orders.map((order) => (
+                  <tr key={order.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
+                      {order.trackingNumber}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
+                      {`${order.customerInfo.firstName} ${order.customerInfo.lastName}`}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                      {new Date(order.createdAt.toDate()).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <span 
+                        className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          order.status === 'processing order' ? 'bg-blue-100 text-blue-800' :
+                          order.status === 'completed' ? 'bg-green-100 text-green-800' :
+                          order.status === 'verify payment' ? 'bg-purple-100 text-purple-800' :
+                          order.status === 'order sent' ? 'bg-green-100 text-green-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {formatStatus(order.status)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                      ${order.totalAmount.toFixed(2)}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
