@@ -853,6 +853,7 @@ const Checkout = () => {
               className="h-5 w-5 absolute right-6 top-6 text-gray-400 hover:text-gray-600 cursor-pointer transition-colors" 
               onClick={() => setShowPasswordModal(false)}
             />
+            <h2 className="text-md text-gray-800 mt-4">To generate secured tracking number and link,</h2>
             <h2 className="text-xl font-semibold text-gray-800 mb-8">Add a Password</h2>
             
             <form onSubmit={handlePasswordSubmit} className="space-y-6">

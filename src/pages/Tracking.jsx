@@ -156,11 +156,45 @@ const Tracking = () => {
     }
   };
 
+  const getStepStatus = (status) => {
+    // Map status to step index
+    const statusToStepIndex = {
+      'pending': 0,
+      'verify payment': 0,
+      'processing order': 1,
+      'order sent': 2
+    };
+
+    const currentStepIndex = statusToStepIndex[status] ?? -1;
+    
+    return (stepIndex) => {
+      if (stepIndex < currentStepIndex) return 'complete';
+      if (stepIndex === currentStepIndex) return 'current';
+      return 'upcoming';
+    };
+  };
+
   const steps = [
-    { status: 'complete', title: 'Waiting for payment confirmation', description: 'Payment confirmation in progress' },
-    { status: 'current', title: 'Processing order', description: 'Your order is being processed' },
-    { status: 'upcoming', title: 'Order sent', description: 'Package is on the way' },
-    { status: 'upcoming', title: "Order sent to customer's address", description: 'Package delivered to destination' },
+    { 
+      title: 'Payment Confirmation', 
+      description: 'Payment confirmation in progress',
+      index: 0
+    },
+    { 
+      title: 'Processing Order', 
+      description: 'Your order is being processed',
+      index: 1
+    },
+    { 
+      title: 'Order Sent', 
+      description: 'Package is on the way',
+      index: 2
+    },
+    { 
+      title: 'Order Delivered', 
+      description: 'Package delivered to destination',
+      index: 3
+    }
   ];
 
   const handlePaymentSent = () => {
@@ -242,76 +276,117 @@ const Tracking = () => {
             {/* Add a background line that spans the entire width */}
             <div className="absolute top-4 left-0 w-full h-0.5 bg-gray-200" aria-hidden="true" />
             
-            {steps.map((step, index) => (
-              <div key={step.title} className="relative flex flex-col items-center flex-1">
-                <div className="relative">
-                  <div className="flex items-center justify-center">
-                    <span className="relative z-10 flex h-8 w-8 items-center justify-center">
-                      {step.status === 'complete' ? (
-                        <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center">
-                          <svg className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                      ) : step.status === 'current' ? (
-                        <div className="h-8 w-8 rounded-full border-2 border-blue-600 bg-white flex items-center justify-center">
-                          <div className="h-2.5 w-2.5 rounded-full bg-blue-600" />
-                        </div>
-                      ) : (
-                        <div className="h-8 w-8 rounded-full border-2 border-gray-300 bg-white" />
-                      )}
-                    </span>
-                  </div>
-                  <div className="mt-3 text-center">
-                    <div className="text-sm font-medium text-gray-900">{step.title}</div>
-                    <p className="text-sm text-gray-500 mt-1 max-w-[150px]">{step.description}</p>
-                    {index === 0 && (
-                      <div className="mt-4">
-                        <div className="w-0.5 h-16 bg-gray-200 mx-auto" />
-                        <div className="relative -mt-1">
-                          <div className="relative flex flex-col items-center">
-                            <span className="flex h-8 w-8 items-center justify-center">
-                              {paymentStatus === 'pending' ? (
-                                <div className="h-8 w-8 rounded-full border-2 border-yellow-500 bg-white flex items-center justify-center">
-                                  <div className="h-2.5 w-2.5 rounded-full bg-yellow-500" />
-                                </div>
-                              ) : paymentStatus === 'verify payment' ? (
-                                <div className="h-8 w-8 rounded-full border-2 border-blue-600 bg-white flex items-center justify-center">
-                                  <div className="h-2.5 w-2.5 rounded-full bg-blue-600" />
-                                </div>
-                              ) : (
-                                <div className="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center">
-                                  <svg className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                </div>
-                              )}
-                            </span>
-                            <div className="mt-3 bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                              {paymentStatus === 'pending' ? (
-                                <>
-                                  <p className="text-yellow-600 font-medium text-sm">Pending Payment</p>
-                                  <button
-                                    onClick={() => setShowPaymentModal(true)}
-                                    className="mt-2 inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded-full text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors whitespace-nowrap"
-                                  >
-                                    Send Payment
-                                  </button>
-                                </>
-                              ) : paymentStatus === 'verify payment' ? (
-                                <p className="text-blue-600 font-medium text-sm">Waiting for Approval</p>
-                              ) : (
-                                <p className="text-green-600 font-medium text-sm">Payment Approved</p>
-                              )}
+            {steps.map((step, index) => {
+              const getStatus = getStepStatus(paymentStatus);
+              const status = getStatus(index);
+              return (
+                <div key={step.title} className="relative flex flex-col items-center flex-1">
+                  <div className="relative">
+                    <div className="flex items-center justify-center">
+                      <span className="relative z-10 flex h-8 w-8 items-center justify-center">
+                        {status === 'complete' ? (
+                          <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center">
+                            <svg className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                        ) : status === 'current' ? (
+                          <div className="h-8 w-8 rounded-full border-2 border-blue-600 bg-white flex items-center justify-center">
+                            <div className="h-2.5 w-2.5 rounded-full bg-blue-600" />
+                          </div>
+                        ) : (
+                          <div className="h-8 w-8 rounded-full border-2 border-gray-300 bg-white" />
+                        )}
+                      </span>
+                    </div>
+                    <div className="mt-3 text-center">
+                      <div className="text-sm font-medium text-gray-900">{step.title}</div>
+                      <p className="text-sm text-gray-500 mt-1 max-w-[150px]">{step.description}</p>
+                      {/* Payment Status for first step */}
+                      {index === 0 && paymentStatus !== 'processing order' && paymentStatus !== 'order sent' && (
+                        <div className="mt-4">
+                          <div className="w-0.5 h-16 bg-gray-200 mx-auto" />
+                          <div className="relative -mt-1">
+                            <div className="relative flex flex-col items-center">
+                              <span className="flex h-8 w-8 items-center justify-center">
+                                {paymentStatus === 'pending' ? (
+                                  <div className="h-8 w-8 rounded-full border-2 border-yellow-500 bg-white flex items-center justify-center">
+                                    <div className="h-2.5 w-2.5 rounded-full bg-yellow-500" />
+                                  </div>
+                                ) : paymentStatus === 'verify payment' ? (
+                                  <div className="h-8 w-8 rounded-full border-2 border-blue-600 bg-white flex items-center justify-center">
+                                    <div className="h-2.5 w-2.5 rounded-full bg-blue-600" />
+                                  </div>
+                                ) : (
+                                  <div className="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center">
+                                    <svg className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  </div>
+                                )}
+                              </span>
+                              <div className="mt-3 bg-white rounded-lg shadow-sm p-4 border border-gray-200">
+                                {paymentStatus === 'pending' ? (
+                                  <>
+                                    <p className="text-yellow-600 font-medium text-sm">Pending Payment</p>
+                                    <button
+                                      onClick={() => setShowPaymentModal(true)}
+                                      className="mt-2 inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded-full text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors whitespace-nowrap"
+                                    >
+                                      Send Payment
+                                    </button>
+                                  </>
+                                ) : paymentStatus === 'verify payment' ? (
+                                  <p className="text-blue-600 font-medium text-sm">Waiting for Approval</p>
+                                ) : (
+                                  <p className="text-green-600 font-medium text-sm">Payment Approved</p>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+                      {/* Processing Status for second step */}
+                      {index === 1 && paymentStatus === 'processing order' && (
+                        <div className="mt-4">
+                          <div className="w-0.5 h-16 bg-gray-200 mx-auto" />
+                          <div className="relative -mt-1">
+                            <div className="relative flex flex-col items-center">
+                              <span className="flex h-8 w-8 items-center justify-center">
+                                <div className="h-8 w-8 rounded-full border-2 border-blue-600 bg-white flex items-center justify-center">
+                                  <div className="h-2.5 w-2.5 rounded-full bg-blue-600" />
+                                </div>
+                              </span>
+                              <div className="mt-3 bg-white rounded-lg shadow-sm p-4 border border-gray-200">
+                                <p className="text-blue-600 font-medium text-sm">Processing Your Order</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {/* Order Sent Status for third step */}
+                      {index === 2 && paymentStatus === 'order sent' && (
+                        <div className="mt-4">
+                          <div className="w-0.5 h-16 bg-gray-200 mx-auto" />
+                          <div className="relative -mt-1">
+                            <div className="relative flex flex-col items-center">
+                              <span className="flex h-8 w-8 items-center justify-center">
+                                <div className="h-8 w-8 rounded-full border-2 border-blue-600 bg-white flex items-center justify-center">
+                                  <div className="h-2.5 w-2.5 rounded-full bg-blue-600" />
+                                </div>
+                              </span>
+                              <div className="mt-3 bg-white rounded-lg shadow-sm p-4 border border-gray-200">
+                                <p className="text-blue-600 font-medium text-sm">Order is on the way</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </main>
@@ -529,7 +604,7 @@ const Tracking = () => {
                     </div>
                   </div>
 
-                  <div>
+                  {/* <div>
                     <label htmlFor="proofOfPayment" className="block text-xs font-medium text-gray-700 mb-1">
                       Proof of Payment
                     </label>
@@ -552,7 +627,7 @@ const Tracking = () => {
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </div> */}
                 </>
               )}
 

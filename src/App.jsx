@@ -25,7 +25,7 @@ import ProtectedStoreRoute from './components/ProtectedStoreRoute';
 const DefaultLayout = ({ children }) => (
   <div className="min-h-screen bg-gray-50 flex flex-col w-full">
     <Navbar />
-    <main className="flex-grow max-w-7xl mx-auto px-4 py-8 w-full">
+    <main className="flex-grow max-w-7xl mx-auto w-full">
       {children}
     </main>
     <Footer />

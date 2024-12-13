@@ -25,6 +25,7 @@ const FranchiseDashboard = () => {
   const [uniqueCustomers, setUniqueCustomers] = useState(0);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [modalType, setModalType] = useState('');
 
   // Initialize dashboard data
   useEffect(() => {
@@ -140,6 +141,8 @@ const FranchiseDashboard = () => {
   // Format status for display
   const formatStatus = (status) => {
     if (status === 'verify payment') return 'Verify Payment';
+    if (status === 'processing order') return 'Processing Order';
+    if (status === 'order sent') return 'Order Sent';
     return status.split(' ')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
@@ -150,7 +153,6 @@ const FranchiseDashboard = () => {
     
     try {
       await orderService.updateOrderStatus(selectedOrder.id, 'processing order');
-      // Update the order in the local state
       setOrders(orders.map(order => 
         order.id === selectedOrder.id 
           ? { ...order, status: 'processing order' }
@@ -160,7 +162,23 @@ const FranchiseDashboard = () => {
       setSelectedOrder(null);
     } catch (error) {
       console.error('Error confirming payment:', error);
-      // You might want to show an error message to the user here
+    }
+  };
+
+  const handleShippingConfirmation = async () => {
+    if (!selectedOrder) return;
+    
+    try {
+      await orderService.updateOrderStatus(selectedOrder.id, 'order sent');
+      setOrders(orders.map(order => 
+        order.id === selectedOrder.id 
+          ? { ...order, status: 'order sent' }
+          : order
+      ));
+      setShowConfirmModal(false);
+      setSelectedOrder(null);
+    } catch (error) {
+      console.error('Error updating shipping status:', error);
     }
   };
 
@@ -180,7 +198,9 @@ const FranchiseDashboard = () => {
                   setSelectedOrder(null);
                 }}
               />
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Confirm Payment</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">
+                {modalType === 'payment' ? 'Confirm Payment' : 'Confirm Shipping'}
+              </h2>
               
               <div className="bg-gray-50 p-3 rounded-lg text-sm mb-4">
                 <p className="text-gray-600">
@@ -189,6 +209,11 @@ const FranchiseDashboard = () => {
                 <p className="text-gray-600">
                   Customer: <span className="font-medium text-gray-900">{selectedOrder.customerInfo.firstName} {selectedOrder.customerInfo.lastName}</span>
                 </p>
+                {modalType === 'shipping' && (
+                  <p className="text-gray-600 mt-2">
+                    The product is sent to the customer?
+                  </p>
+                )}
               </div>
 
               <div className="flex justify-center gap-3">
@@ -202,10 +227,10 @@ const FranchiseDashboard = () => {
                   Cancel
                 </button>
                 <button
-                  onClick={handlePaymentConfirmation}
+                  onClick={modalType === 'payment' ? handlePaymentConfirmation : handleShippingConfirmation}
                   className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors"
                 >
-                  Confirm Payment
+                  {modalType === 'payment' ? 'Confirm Payment' : 'Confirm Shipping'}
                 </button>
               </div>
             </div>
@@ -368,15 +393,22 @@ const FranchiseDashboard = () => {
                         <span 
                           className={`px-2 py-1 text-xs font-semibold rounded-full ${
                             order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            order.status === 'processing order' ? 'bg-blue-100 text-blue-800' :
+                            order.status === 'processing order' ? 'bg-blue-100 text-blue-800 cursor-pointer hover:bg-blue-200' :
                             order.status === 'completed' ? 'bg-green-100 text-green-800' :
                             order.status === 'verify payment' ? 'bg-purple-100 text-purple-800 cursor-pointer hover:bg-purple-200' :
+                            order.status === 'order sent' ? 'bg-green-100 text-green-800' :
                             'bg-gray-100 text-gray-800'
                           }`}
                           onClick={(e) => {
                             if (order.status === 'verify payment') {
                               e.stopPropagation();
                               setSelectedOrder(order);
+                              setModalType('payment');
+                              setShowConfirmModal(true);
+                            } else if (order.status === 'processing order') {
+                              e.stopPropagation();
+                              setSelectedOrder(order);
+                              setModalType('shipping');
                               setShowConfirmModal(true);
                             }
                           }}
