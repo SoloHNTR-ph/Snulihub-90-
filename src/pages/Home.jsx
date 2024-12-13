@@ -2,19 +2,18 @@ import { Link } from 'react-router-dom'
 
 const Home = () => {
   return (
-    <div className="bg-white">
+    <div className="bg-transparent">
       {/* Hero Section */}
       <div className="relative overflow-hidden">
-        <div className="absolute inset-0">
+        {/* <div className="absolute inset-0">
           <img
-            src="https://images.unsplash.com/photo-1543362906-acfc16c67564?ixlib=rb-4.0.3"
+            src="https://sewapoint.com/image-categories/image-1723429886178-soyabean.webp"
             alt="Background"
-            className="w-full h-full object-cover opacity-20"
+            className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-white via-white/95 to-white/90" />
-        </div>
+        </div> */}
         
-        <div className="relative max-w-7xl mx-auto py-24 px-4 sm:py-32 sm:px-6 lg:px-8">
+        <div className="relative  py-24 sm:py-32 lg:px-8">
           <div className="text-center">
             <h1 className="mt-1 text-4xl tracking-tight font-extrabold text-gray-900 sm:text-5xl md:text-6xl fade-in-up">
               <span className="block text-5xl sm:text-6xl md:text-7xl mb-3">Snuli-hub</span>

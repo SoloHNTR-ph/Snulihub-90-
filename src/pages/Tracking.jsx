@@ -168,6 +168,9 @@ const Tracking = () => {
     const currentStepIndex = statusToStepIndex[status] ?? -1;
     
     return (stepIndex) => {
+      // When order is sent, mark all steps as complete
+      if (status === 'order sent') return 'complete';
+      
       if (stepIndex < currentStepIndex) return 'complete';
       if (stepIndex === currentStepIndex) return 'current';
       return 'upcoming';
@@ -189,11 +192,6 @@ const Tracking = () => {
       title: 'Order Sent', 
       description: 'Package is on the way',
       index: 2
-    },
-    { 
-      title: 'Order Delivered', 
-      description: 'Package delivered to destination',
-      index: 3
     }
   ];
 
